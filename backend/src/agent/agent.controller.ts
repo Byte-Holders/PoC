@@ -19,11 +19,12 @@ export class AgentController {
   constructor(private readonly agentService: AgentService) {}
 
   @Get()
-  async testConnection() {
+  testConnection() {
     const newReport = new ReportModel({
       name: "TestReportName",
       description: "TestReportDescription",
     });
     newReport.save().catch((reason) => { console.log("Failed on report save") });
+    return "Called";
   }
 }
