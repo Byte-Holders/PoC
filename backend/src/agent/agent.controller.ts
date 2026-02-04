@@ -23,23 +23,25 @@ const reportModel = mongoose.model('report', reportDtoSchema);
 @Controller('agent')
 export class AgentController {
   constructor(private readonly AgentService: AgentService) {}
+  date = new Date();
 
   @Get('results')
   async findReports() {
-    return reportModel.find();
+    return reportModel.findOne({ date: this.date }, 'report -_id');
   }
 
   @Get('scan')
   @Redirect()
   async getScan() {
+    const date = new Date();
     const report = await this.AgentService.execute();
     const reportsDir = path.resolve('./reports');
 
     try {
-      if (!fs.existsSync(reportsDir)) return "Cartella reports non trovata";
-      const files = fs.readdirSync(reportsDir)
+      if (!fs.existsSync(reportsDir)) return 'Cartella reports non trovata';
+      const files = fs.readdirSync(reportsDir);
 
-      if (files.length === 0) return "Nessun file di report trovato";
+      if (files.length === 0) return 'Nessun file di report trovato';
 
       const latestFile = path.join(reportsDir, files[0]);
 
@@ -50,7 +52,7 @@ export class AgentController {
       const results = semgrepData.results;
 
       if (!results || results.length === 0) {
-        return "Il report è valido ma non contiene vulnerabilità (results vuoto).";
+        return 'Il report è valido ma non contiene vulnerabilità (results vuoto).';
       }
       //Prendiamo la prima vulnerabilità trovata
       const firstIssue = results[0];
@@ -59,15 +61,14 @@ export class AgentController {
       const newReport = new reportModel({
         name: firstIssue.check_id,
         description: firstIssue.extra?.message || 'Nessuna descrizione',
-        date: new Date(),
+        date: this.date,
         report: report,
       });
 
       await newReport.save();
-
     } catch (e) {
-      return e instanceof Error ? e.message : "Errore";
+      return e instanceof Error ? e.message : 'Errore';
     }
-     return { url: `../agent/results` };
+    return { url: `../agent/results` };
   }
 }
