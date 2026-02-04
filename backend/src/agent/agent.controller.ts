@@ -8,12 +8,14 @@ class ReportDto {
   name: string;
   description: string;
   date: Date;
+  report: string;
 }
 
 const reportDtoSchema = new mongoose.Schema<ReportDto>({
   name: String,
   description: String,
   date: Date,
+  report: String,
 });
 
 const reportModel = mongoose.model('report', reportDtoSchema);
@@ -30,7 +32,7 @@ export class AgentController {
   @Get('scan')
   @Redirect()
   async getScan() {
-    await this.AgentService.runSemgrepScan();
+    const report = await this.AgentService.execute();
     const reportsDir = path.resolve('./reports');
 
     try {
@@ -56,8 +58,9 @@ export class AgentController {
       // Mappo i campi dati del json
       const newReport = new reportModel({
         name: firstIssue.check_id,
-        description: firstIssue.extra?.message || "Nessuna descrizione",
+        description: firstIssue.extra?.message || 'Nessuna descrizione',
         date: new Date(),
+        report: report,
       });
 
       await newReport.save();

@@ -1,21 +1,27 @@
-import { Injectable } from "@nestjs/common";
-//import { HttpService } from "@nestjs/axios";
+import { Injectable } from '@nestjs/common';
 import path from 'path';
 import fs from 'fs';
 import { execSync } from 'child_process';
+import { StateGraph, START, END, Annotation } from '@langchain/langgraph';
+import { SystemMessage, HumanMessage } from '@langchain/core/messages';
+import { ChatBedrockConverse } from '@langchain/aws';
+
+const AgentState = Annotation.Root({
+  reportPath: Annotation<string>(),
+  analysis: Annotation<string>(),
+});
 
 @Injectable()
 export class AgentService {
-  constructor(/* private readonly httpService: HttpService */) {}
-
-  dateStr = new Date().toISOString().replace(/[:.]/g, '-');
-  reportPath = path.resolve(`./reports/test_scan_${this.dateStr}.json`);
 
   async runSemgrepScan() {
+    const dateStr = new Date().toISOString().replace(/[:.]/g, '-');
+    const reportPath = path.resolve(`./reports/test_scan_${dateStr}.json`);
+
     console.log('Avvio test Semgrep...');
 
     //Se non esiste la cartella report la crea
-    const outputDir = path.dirname(this.reportPath);
+    const outputDir = path.dirname(reportPath);
     if (!fs.existsSync(outputDir)) {
       fs.mkdirSync(outputDir, { recursive: true });
       console.log(`Creo la cartella: ${outputDir}`);
@@ -36,16 +42,50 @@ export class AgentService {
       console.log(`Scansione in corso su: ${projectRoot}`);
 
       execSync(
-        `semgrep scan ${projectRoot} --config auto --json --output ${this.reportPath} --exclude=node_modules --exclude=reports --exclude=dist --quiet`,
+        `semgrep scan ${projectRoot} --config auto --json --output ${reportPath} --exclude=node_modules --exclude=reports --exclude=dist --quiet`,
         {
           stdio: 'inherit',
           encoding: 'utf-8',
         },
       );
-      console.log(`Scansione completata. File salvato in: ${this.reportPath}`);
-
+      console.log(`Scansione completata. File salvato in: ${reportPath}`);
     } catch (error) {
       console.error("Errore durante l'esecuzione di Semgrep:", error);
     }
+  }
+
+  // workflow
+
+  async execute() {
+    const workflow = new StateGraph(AgentState)
+
+      // Nodo 1: Esegue la tua scansione
+      .addNode('run_scan', async () => {
+        const pathGenerated = await this.runSemgrepScan();
+        return { reportPath: pathGenerated };
+      })
+
+      .addNode('ai_analysis', async (state) => {
+        const fullJsonRaw = fs.readFileSync(state.reportPath, 'utf-8');
+
+        const response = await this.model.invoke([
+          new SystemMessage(
+            `Crea un report dettagliato e discorsivo(non elenco puntato) del file report restituito da Semgrep, facendo notare le vulnerabilita' piu critiche`,
+          ),
+          new HumanMessage(
+            `Ecco il file JSON integrale della scansione: \n\n ${fullJsonRaw}`,
+          ),
+        ]);
+
+        return { analysis: response.content as string };
+      })
+
+      .addEdge(START, 'run_scan')
+      .addEdge('run_scan', 'ai_analysis')
+      .addEdge('ai_analysis', END);
+
+    const app = workflow.compile();
+
+    return await app.invoke({});
   }
 }
