@@ -3,7 +3,10 @@ ARG NODE_VERSION=24.11.1
 FROM node:${NODE_VERSION}-alpine
 WORKDIR /usr/src/app
 
+RUN rm -rf node_modules
+
 COPY package*.json .
+
 RUN npm install
 
 RUN --mount=type=cache,target=/root/.npm\
