@@ -23,11 +23,10 @@ const reportModel = mongoose.model('report', reportDtoSchema);
 @Controller('agent')
 export class AgentController {
   constructor(private readonly AgentService: AgentService) {}
-  date = new Date();
 
   @Get('results')
   async findReports() {
-    return reportModel.findOne({ date: this.date }, 'report -_id');
+    return reportModel.find().sort({date: -1}).limit(1);
   }
 
   @Get('scan')
@@ -61,7 +60,7 @@ export class AgentController {
       const newReport = new reportModel({
         name: firstIssue.check_id,
         description: firstIssue.extra?.message || 'Nessuna descrizione',
-        date: this.date,
+        date: date,
         report: report,
       });
 
