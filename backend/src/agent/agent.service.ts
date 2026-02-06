@@ -23,7 +23,7 @@ export type ModelCreateInfo = {
 
 @Injectable()
 export class AgentService {
-  async runSemgrepScan(): Promise<string | unknown> {
+  async runSemgrepScan(repoPath: string): Promise<string | unknown> {
     const dateStr = new Date().toISOString().replace(/[:.]/g, '-');
     const reportPath = path.resolve(`./reports/test_scan_${dateStr}.json`);
 
@@ -47,7 +47,7 @@ export class AgentService {
       }
 
       //Avvia la scansione su projectRoot che pero si cambia easy se serve fare la scansione su qualcosa di diverso.
-      const projectRoot = process.cwd();
+      const projectRoot = '../../Repository' + repoPath;
       console.log(`Scansione in corso su: ${projectRoot}`);
 
       execSync(
@@ -67,21 +67,28 @@ export class AgentService {
 
   // workflow
 
-  async execute() {
+  async execute(repoLink: string) {
+    const repoPath = repoLink.split('/').pop()!.replace('.git', '');
+    if (repoPath.length <= 0) {
+      return console.log('Nessuna repo trovata.');
+    }
     const model = this.createModel({
-      name: "qwen.qwen3-coder-30b-a3b-v1:0"
+      name: 'qwen.qwen3-coder-30b-a3b-v1:0',
     });
     const workflow = new StateGraph(AgentState)
 
       // Nodo 1: Esegue la tua scansione
       .addNode('run_scan', async () => {
-        const pathGenerated = await this.runSemgrepScan();
+        const pathGenerated = await this.runSemgrepScan(repoPath);
         return { reportPath: pathGenerated };
       })
 
       .addNode('ai_analysis', async (state) => {
         // non gestisco errori
-        const fullJsonRaw = fs.readFileSync(state.reportPath as string, 'utf-8');
+        const fullJsonRaw = fs.readFileSync(
+          state.reportPath as string,
+          'utf-8',
+        );
 
         console.log('Chiamata al modello');
         const response = await model.invoke([

@@ -1,4 +1,4 @@
-import { Controller, Get, Redirect } from "@nestjs/common";
+import { Controller, Get, Redirect, Body, Post } from "@nestjs/common";
 import { AgentService } from "./agent.service";
 import * as mongoose from "mongoose";
 import * as path from 'path';
@@ -18,6 +18,11 @@ const reportDtoSchema = new mongoose.Schema<ReportDto>({
   report: String,
 });
 
+interface Repository {
+  name: string;
+  link: string;
+}
+
 const reportModel = mongoose.model('report', reportDtoSchema);
 
 @Controller('agent')
@@ -26,14 +31,14 @@ export class AgentController {
 
   @Get('results')
   async findReports() {
-    return reportModel.find().sort({date: -1}).limit(1);
+    return reportModel.find().sort({ date: -1 }).limit(1);
   }
 
-  @Get('scan')
+  @Post('scan')
   @Redirect()
-  async getScan() {
+  async getScan(@Body() body: { repoLink: string }) {
     const date = new Date();
-    const report = await this.AgentService.execute();
+    const report = await this.AgentService.execute(body.repoLink);
     const reportsDir = path.resolve('./reports');
 
     try {
