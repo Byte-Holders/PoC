@@ -1,4 +1,4 @@
-import { Controller, Get, Redirect } from "@nestjs/common";
+import { Body, Controller, Get, Post, Query, Redirect } from "@nestjs/common";
 import { AgentService } from "./agent.service";
 import * as mongoose from "mongoose";
 import * as path from 'path';
@@ -22,11 +22,11 @@ const reportModel = mongoose.model('report', reportDtoSchema);
 
 @Controller('agent')
 export class AgentController {
-  constructor(private readonly AgentService: AgentService) {}
+  constructor(private readonly AgentService: AgentService) { }
 
   @Get('results')
   async findReports() {
-    return reportModel.find().sort({date: -1}).limit(1);
+    return reportModel.find().sort({ date: -1 }).limit(1);
   }
 
   @Get('scan')
@@ -69,5 +69,10 @@ export class AgentController {
       return e instanceof Error ? e.message : 'Errore';
     }
     return { url: `../agent/results` };
+  }
+
+  @Post('clone')
+  cloneRepo(@Body('target') url: string) {
+    this.AgentService.cloneRepo(url);
   }
 }

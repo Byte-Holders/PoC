@@ -1,5 +1,7 @@
 import { useState } from "react";
 import "./App.css";
+import axios from "axios";
+import CloneRepo from "./CloneRepo"; 
 
 function App() {
   const [conn, setConn] = useState("");
@@ -27,10 +29,13 @@ function App() {
           Avvio Scan
           <br />
         </button>
-          <h2>Ecco il Report!</h2>
-          <p>
-               {conn}
-          </p>
+        <h2>Ecco il Report!</h2>
+        <p>
+          {conn}
+        </p>
+      </div>
+      <div className="card">
+        <CloneRepo />
       </div>
     </>
   );

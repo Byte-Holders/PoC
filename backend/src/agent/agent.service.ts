@@ -2,9 +2,14 @@ import { Injectable } from '@nestjs/common';
 import path from 'path';
 import fs from 'fs';
 import { execSync } from 'child_process';
-import { StateGraph, START, END, Annotation, GraphNode } from '@langchain/langgraph';
+import { StateGraph, START, END, Annotation } from '@langchain/langgraph';
 import { SystemMessage, HumanMessage } from '@langchain/core/messages';
 import { ChatBedrockConverse } from '@langchain/aws';
+import git from 'isomorphic-git';
+// import per isomorphic-git (clone)
+import http from 'isomorphic-git/http/node';
+// import fs from 'fs'; (sopra)
+
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -109,11 +114,28 @@ export class AgentService {
 
   private createModel(modelCI: ModelCreateInfo) {
     console.log(`Creazione llm: ${modelCI.name}`);
+
     return new ChatBedrockConverse({
       model: modelCI.name,
       region: process.env.BEDROCK_AWS_REGION || modelCI.region || 'eu-north-1',
       temperature: modelCI.temperature || 0,
       maxTokens: modelCI.maxTokens || 1000,
     });
+  }
+
+  cloneRepo(url: string) {
+    console.log(`Ricevuto: ${url}`);
+    const clonePath: string = path.join('/usr/src/repos', url.split('/').findLast(() => true)!);
+
+    console.log(`Esecuzione git clone, verrà salvata in ${clonePath}`);
+
+    git.clone({
+      http,
+      fs,
+      dir: clonePath,
+      url,
+    });
+
+    console.log(`Repo clonata in ${clonePath}`);
   }
 }
