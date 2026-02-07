@@ -3,37 +3,28 @@ import { AgentService } from "./agent.service";
 import * as mongoose from "mongoose";
 import * as path from 'path';
 import * as fs from 'fs';
+import { InjectModel } from '@nestjs/mongoose';
+import { Report } from '../mongo/mongo.schema';
+import { Model } from 'mongoose';
 
-class ReportDto {
-  name: string;
-  description: string;
-  date: Date;
-  report: string;
-}
-
-const reportDtoSchema = new mongoose.Schema<ReportDto>({
-  name: String,
-  description: String,
-  date: Date,
-  report: String,
-});
-
-const reportModel = mongoose.model('report', reportDtoSchema);
 
 @Controller('agent')
 export class AgentController {
-  constructor(private readonly AgentService: AgentService) { }
+  constructor(
+    private readonly agentService: AgentService,
+    @InjectModel(Report.name) private reportModel: Model<Report>,
+  ) {}
 
   @Get('results')
   async findReports() {
-    return reportModel.find().sort({ date: -1 }).limit(1);
+    return this.reportModel.find().sort({ date: -1 }).limit(1);
   }
 
-  @Get('scan')
+  @Post('scan')
   @Redirect()
-  async getScan() {
+  async getScan(@Body() body: { repoLink: string }) {
     const date = new Date();
-    const report = await this.AgentService.execute();
+    const report = await this.agentService.execute(body.repoLink);
     const reportsDir = path.resolve('./reports');
 
     try {
@@ -57,7 +48,7 @@ export class AgentController {
       const firstIssue = results[0];
 
       // Mappo i campi dati del json
-      const newReport = new reportModel({
+      const newReport = new this.reportModel({
         name: firstIssue.check_id,
         description: firstIssue.extra?.message || 'Nessuna descrizione',
         date: date,
