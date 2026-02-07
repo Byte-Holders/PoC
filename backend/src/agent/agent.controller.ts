@@ -1,4 +1,4 @@
-import { Controller, Get, Redirect, Body, Post } from "@nestjs/common";
+import { Body, Controller, Get, Post, Query, Redirect } from "@nestjs/common";
 import { AgentService } from "./agent.service";
 import * as mongoose from "mongoose";
 import * as path from 'path';
@@ -60,5 +60,10 @@ export class AgentController {
       return e instanceof Error ? e.message : 'Errore';
     }
     return { url: `../agent/results` };
+  }
+
+  @Post('clone')
+  cloneRepo(@Body('target') url: string) {
+    this.AgentService.cloneRepo(url);
   }
 }
