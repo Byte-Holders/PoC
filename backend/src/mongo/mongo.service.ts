@@ -23,4 +23,3 @@ export class MongoService {
     return newRepo.save();
   }
 }
-

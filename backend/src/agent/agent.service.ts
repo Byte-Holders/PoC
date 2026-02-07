@@ -52,7 +52,7 @@ export class AgentService {
       }
 
       //Avvia la scansione su projectRoot che pero si cambia easy se serve fare la scansione su qualcosa di diverso.
-      const projectRoot = '../../Repository' + repoPath;
+      const projectRoot = '/usr/src/repos/' + repoPath;
       console.log(`Scansione in corso su: ${projectRoot}`);
 
       execSync(
@@ -73,7 +73,7 @@ export class AgentService {
   // workflow
 
   async execute(repoLink: string) {
-    const repoPath = repoLink.split('/').pop()!.replace('.git', '');
+    const repoPath = repoLink.split('/').pop()!;
     if (repoPath.length <= 0) {
       return console.log('Nessuna repo trovata.');
     }
@@ -130,13 +130,13 @@ export class AgentService {
     });
   }
 
-  cloneRepo(url: string) {
+   cloneRepo(url: string) {
     console.log(`Ricevuto: ${url}`);
     const clonePath: string = path.join('/usr/src/repos', url.split('/').findLast(() => true)!);
 
     console.log(`Esecuzione git clone, verrà salvata in ${clonePath}`);
 
-    git.clone({
+     git.clone({
       http,
       fs,
       dir: clonePath,

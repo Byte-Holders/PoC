@@ -1,9 +1,10 @@
 import { Module } from '@nestjs/common';
 import { MongoService } from './mongo.service';
+import { AgentService } from '../agent/agent.service';
 import { MongoController } from './mongo.controller';
 import { MongooseModule } from '@nestjs/mongoose';
-import { Repository, RepositorySchema } from './mongo.schema'
-  ;
+import { Repository, RepositorySchema } from './mongo.schema';
+
 @Module({
   imports: [
     // Registra lo schema qui per renderlo disponibile al Service
@@ -11,7 +12,7 @@ import { Repository, RepositorySchema } from './mongo.schema'
       { name: Repository.name, schema: RepositorySchema },
     ]),
   ],
-  providers: [MongoService],
+  providers: [MongoService, AgentService],
   controllers: [MongoController],
 })
 export class MongoModule {}

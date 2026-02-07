@@ -64,6 +64,6 @@ export class AgentController {
 
   @Post('clone')
   cloneRepo(@Body('target') url: string) {
-    this.AgentService.cloneRepo(url);
+    this.agentService.cloneRepo(url);
   }
 }

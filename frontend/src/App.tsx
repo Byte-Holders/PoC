@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import "./App.css";
-import axios from "axios";
-import CloneRepo from "./CloneRepo"; 
+import CloneRepo from "./CloneRepo";
 
 interface Repository {
     _id: string;
@@ -67,10 +66,11 @@ function App() {
                 body: JSON.stringify(newRepo)
             });
 
+
             // 2. Controllo risposta (res.ok è true per 200-299)
             if (res.ok) {
                 alert("Salvataggio riuscito!");
-                fetchRepos();       // Ricarica la lista
+                fetchRepos();
             } else {
                 // Leggiamo il messaggio di errore dal server
                 const errorText = await res.text();
@@ -145,9 +145,9 @@ function App() {
                 <h2>Ecco il Report!</h2>
                 <p>{conn}</p>
             </div>
-              <div className="card">
+            {/*<div className="card">
             <CloneRepo />
-      </div>
+            </div>*/}
         </>
     );
 }
