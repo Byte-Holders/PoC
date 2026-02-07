@@ -9,6 +9,7 @@ import git from 'isomorphic-git';
 // import per isomorphic-git (clone)
 import http from 'isomorphic-git/http/node';
 // import fs from 'fs'; (sopra)
+import { Octokit } from 'octokit';
 
 import dotenv from 'dotenv';
 
@@ -28,6 +29,10 @@ export type ModelCreateInfo = {
 
 @Injectable()
 export class AgentService {
+  constructor() {
+    this.octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
+  }
+
   async runSemgrepScan(repoPath: string): Promise<string | unknown> {
     const dateStr = new Date().toISOString().replace(/[:.]/g, '-');
     const reportPath = path.resolve(`./reports/test_scan_${dateStr}.json`);
@@ -130,13 +135,13 @@ export class AgentService {
     });
   }
 
-   cloneRepo(url: string) {
+  cloneRepo(url: string) {
     console.log(`Ricevuto: ${url}`);
     const clonePath: string = path.join('/usr/src/repos', url.split('/').findLast(() => true)!);
 
     console.log(`Esecuzione git clone, verrà salvata in ${clonePath}`);
 
-     git.clone({
+    git.clone({
       http,
       fs,
       dir: clonePath,
@@ -145,4 +150,25 @@ export class AgentService {
 
     console.log(`Repo clonata in ${clonePath}`);
   }
+
+  async authTest() {
+    const { data: { login } } = await this.octokit.rest.users.getAuthenticated();
+    return login;
+  }
+
+  async fetchRepoInfo({ owner, repo }: { owner: string, repo: string }) {
+    const languages = await this.octokit.rest.repos.listLanguages({ repo, owner });
+    console.log(languages);
+
+    const total = Object.values(languages.data).reduce((prev, curr) => curr + prev);
+    console.log(`Total ${total}`);
+
+    const result = Object.entries(languages.data).map((langInfo: [string, number]) => {
+      return [langInfo.at(0), langInfo.at(1) as number / total * 100];
+    })
+
+    return result;
+  }
+
+  private readonly octokit: Octokit;
 }

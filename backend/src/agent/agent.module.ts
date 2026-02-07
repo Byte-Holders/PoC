@@ -3,7 +3,6 @@ import { AgentService } from './agent.service';
 import { AgentController } from './agent.controller';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Report, ReportSchema } from '../mongo/mongo.schema';
-// import { HttpModule } from '@nestjs/axios';
 
 @Module({
   imports: [
@@ -14,5 +13,5 @@ import { Report, ReportSchema } from '../mongo/mongo.schema';
   controllers: [AgentController],
   providers: [AgentService],
 })
-export class AgentModule {}
+export class AgentModule { }
 
