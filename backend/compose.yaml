@@ -11,6 +11,7 @@ services:
     volumes:
       - .:/usr/src/app
       - /usr/src/app/node_modules
+      - ${PROJECT_ROOT}/repos:/usr/src/repos
     env_file:
       - .env
     environment:
