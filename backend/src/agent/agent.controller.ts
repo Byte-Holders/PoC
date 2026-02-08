@@ -13,7 +13,7 @@ export class AgentController {
   constructor(
     private readonly agentService: AgentService,
     @InjectModel(Report.name) private reportModel: Model<Report>,
-  ) {}
+  ) { }
 
   @Get('results')
   async findReports() {
@@ -21,8 +21,8 @@ export class AgentController {
   }
 
   @Post('scan')
-  @Redirect()
   async getScan(@Body() body: { repoLink: string }) {
+    return dummy;
     const date = new Date();
     const report = await this.agentService.execute(body.repoLink);
     const reportsDir = path.resolve('./reports');
@@ -49,17 +49,24 @@ export class AgentController {
 
       // Mappo i campi dati del json
       const newReport = new this.reportModel({
-        name: firstIssue.check_id,
-        description: firstIssue.extra?.message || 'Nessuna descrizione',
+        // name: firstIssue.check_id,
+        name: 'Placeholder name',
+        // description: firstIssue.extra?.message || 'Nessuna descrizione',
+        description: 'Placeholder description',
         date: date,
         report: report,
       });
 
+      console.log("Before save");
+
       await newReport.save();
+
+      return newReport.report;
     } catch (e) {
       return e instanceof Error ? e.message : 'Errore';
     }
-    return { url: `../agent/results` };
+    // unreachable
+    // return { url: `../agent/results` };
   }
 
   @Post('clone')
@@ -67,3 +74,24 @@ export class AgentController {
     this.agentService.cloneRepo(url);
   }
 }
+
+const dummy = `# Analisi Report: Vulnerabilità di Sicurezza
+
+Il tool ha fornito informazioni dettagliate sulle potenziali vulnerabilità di sicurezza presenti nei file del **backend** e **frontend**. Questo documento analizza il contenuto del report, evidenziando le problematiche più critiche e spiegando le conseguenze che potrebbero derivarne per la sicurezza dell'applicazione.
+
+## Risultati Principali
+Qua ci vanno i **risultati principali**
+
+### Un primo risultati
+
+**Problema**: spiegazione del problema
+
+**Conseguenze**:
+- conseguenza 1
+- conseguenza 2
+- *conseguenza 3*
+
+**Soluzione raccomandata**:
+\`Esempio soluzione\`
+
+`;
