@@ -73,6 +73,6 @@ export class AgentController {
 
   @Get('languages')
   async getLanguages() {
-    return await this.agentService.fetchRepoInfo({ repo: 'PoC', owner: 'Byte-Holders' });
+    return await this.agentService.fetchLanguages({ repo: 'PoC', owner: 'Byte-Holders' });
   }
 }
