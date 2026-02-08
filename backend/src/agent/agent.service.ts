@@ -79,12 +79,15 @@ export class AgentService {
 
   async execute(repoLink: string) {
     const repoPath = repoLink.split('/').pop()!;
+    const repoOwner = repoLink.split('/').at(-2)!;
     if (repoPath.length <= 0) {
       return console.log('Nessuna repo trovata.');
     }
+
     const model = this.createModel({
       name: 'qwen.qwen3-coder-30b-a3b-v1:0',
     });
+
     const workflow = new StateGraph(AgentState)
 
       // Nodo 1: Esegue la tua scansione
@@ -115,9 +118,20 @@ export class AgentService {
         return { analysis: response.content as string };
       })
 
+      .addNode('get_languages', async (state) => {
+        // per ora non modifico AgentState
+        const languages = await this.fetchLanguages({ owner: repoOwner, repo: repoPath });
+        const stringified = languages
+          .map((value: (string | number | undefined)[]) => `${value[0]}: ${value[1]}`)
+          .reduce((prev: string, curr: string) => `${prev}\n${curr}`);
+        const response = `**Linguaggi:**\n${stringified}`;
+        return { analysis: `${state.analysis + response}` };
+      })
+
       .addEdge(START, 'run_scan')
       .addEdge('run_scan', 'ai_analysis')
-      .addEdge('ai_analysis', END);
+      .addEdge('ai_analysis', 'get_languages')
+      .addEdge('get_languages', END);
 
     const app = workflow.compile();
 
@@ -156,7 +170,9 @@ export class AgentService {
     return login;
   }
 
-  async fetchRepoInfo({ owner, repo }: { owner: string, repo: string }) {
+  async fetchLanguages({ owner, repo }: { owner: string, repo: string }) {
+    console.log(`Owner: ${owner}`);
+    console.log(`Repo: ${repo}`);
     const languages = await this.octokit.rest.repos.listLanguages({ repo, owner });
     console.log(languages);
 
