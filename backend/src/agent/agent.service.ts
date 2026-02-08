@@ -61,7 +61,7 @@ export class AgentService {
       console.log(`Scansione in corso su: ${projectRoot}`);
 
       execSync(
-        `semgrep scan ${projectRoot} --config auto --json --output ${reportPath} --exclude=node_modules --exclude=reports --exclude=dist --quiet`,
+        `semgrep scan ${projectRoot} --config auto --json --output ${reportPath} --exclude=node_modules --exclude=reports --exclude=dist --quiet --no-git-ignore`,
         {
           stdio: 'inherit',
           encoding: 'utf-8',
@@ -121,10 +121,15 @@ export class AgentService {
       .addNode('get_languages', async (state) => {
         // per ora non modifico AgentState
         const languages = await this.fetchLanguages({ owner: repoOwner, repo: repoPath });
+
         const stringified = languages
           .map((value: (string | number | undefined)[]) => `${value[0]}: ${value[1]}`)
           .reduce((prev: string, curr: string) => `${prev}\n${curr}`);
+
         const response = `**Linguaggi:**\n${stringified}`;
+
+        console.log(response);
+
         return { analysis: `${state.analysis + response}` };
       })
 
@@ -160,6 +165,7 @@ export class AgentService {
       fs,
       dir: clonePath,
       url,
+      // ref: 'develop',
     });
 
     console.log(`Repo clonata in ${clonePath}`);
