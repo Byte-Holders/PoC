@@ -7,6 +7,7 @@ import {MongoService} from './mongo/mongo.service';
 import {MongoController } from './mongo/mongo.controller';
 import { MongooseModule } from '@nestjs/mongoose';
 import * as dotenv from 'dotenv';
+import { CoverageModule } from './test_coverage/coverage.module';
 
 
 dotenv.config();
@@ -22,7 +23,7 @@ const mongoQuery = `mongodb://${mongoUser}:${mongoPassword}@${mongoHost}:${mongo
 console.log(`Configurazione Mongo per NestJS: ${mongoQuery}`);
 
 @Module({
-  imports: [MongooseModule.forRoot(mongoQuery), MongoModule, AgentModule],
+  imports: [MongooseModule.forRoot(mongoQuery), MongoModule, AgentModule, CoverageModule],
   controllers: [AppController],
   providers: [AppService],
 })
