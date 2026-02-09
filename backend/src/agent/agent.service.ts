@@ -124,28 +124,54 @@ export class AgentService {
 
                 return { analysis: response.content as string };
             })
+            
+            // Nodo 4: Scan README
+            .addNode('readme_analysis', async (state: typeof AgentState.State) => {
+              const analisiREADME = await this.scanREADME(repoPath);
+              console.log(`Analisi README generata: ${analisiREADME}`);
+              return { analysis:  state.analysis + "\n\nAnalisi del README:\n" + analisiREADME  };
+            })
 
             // --- Definizione dei collegamenti ---
             .addEdge(START, 'run_scan')
             .addEdge('run_scan', 'run_coverage') // Sequenziale
             .addEdge('run_coverage', 'ai_analysis')
-            .addEdge('ai_analysis', END);
+            .addEdge('ai_analysis', 'readme_analysis')
+            .addEdge('readme_analysis', END);
 
         const app = workflow.compile();
 
         return (await app.invoke({})).analysis;
     }
 
-    private createModel(modelCI: ModelCreateInfo) {
-        console.log(`Creazione llm: ${modelCI.name}`);
+  async scanREADME(repoPath: string) {
 
-        return new ChatBedrockConverse({
-            model: modelCI.name,
-            region: process.env.BEDROCK_AWS_REGION || modelCI.region || 'eu-north-1',
-            temperature: modelCI.temperature || 0,
-            maxTokens: modelCI.maxTokens || 1000,
-        });
+    repoPath = '/usr/src/repos/' + repoPath;
+
+    const modelReadMe = this.createModel({
+      name: 'qwen.qwen3-coder-30b-a3b-v1:0',
+    });
+
+    const listaFile = fs.readdirSync(repoPath);
+
+    if(!listaFile.includes("README.md")){
+      return "\n\nIl repository non contiene un file README.md, quindi non è possibile analizzarlo.";
     }
+
+    const readMePath = path.join(repoPath, "README.md");
+    
+    const readMecontent = fs.readFileSync(readMePath, "utf-8");
+        
+    const analisiREADME = await modelReadMe.invoke([
+        new SystemMessage("sei un esperto valutatore di documentazione, devi valutare i README dei repository, individuandone le criticità, rispondi senza saluti iniziali, vai dritto al punto"),
+        new HumanMessage(`ecco il contenuto del README:\n${readMecontent}`)
+    ]);
+
+    return analisiREADME.content;
+  }
+
+
+  // workflow
 
     async cloneRepo(url: string): Promise<string> {
         console.log(`Ricevuto: ${url}`);
@@ -173,5 +199,16 @@ export class AgentService {
 
         console.log(`Repo clonata con successo in ${clonePath}`);
         return clonePath;
+    }
+  
+    private createModel(modelCI: ModelCreateInfo) {
+      console.log(`Creazione llm: ${modelCI.name}`);
+
+      return new ChatBedrockConverse({
+        model: modelCI.name,
+        region: process.env.BEDROCK_AWS_REGION || modelCI.region || 'eu-north-1',
+        temperature: modelCI.temperature || 0,
+        maxTokens: modelCI.maxTokens || 1000,
+      });
     }
 }
