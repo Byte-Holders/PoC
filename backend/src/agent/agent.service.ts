@@ -127,7 +127,7 @@ export class AgentService {
             
             // Nodo 4: Scan README
             .addNode('readme_analysis', async (state: typeof AgentState.State) => {
-              const analisiREADME = await this.scanREADME(repoPath);
+              const analisiREADME = await this.scanREADME(fullRepoPath);
               console.log(`Analisi README generata: ${analisiREADME}`);
               return { analysis:  state.analysis + "\n\nAnalisi del README:\n" + analisiREADME  };
             })
@@ -146,7 +146,7 @@ export class AgentService {
 
   async scanREADME(repoPath: string) {
 
-    repoPath = '/usr/src/repos/' + repoPath;
+    console.log(`Inizio analisi README in: ${repoPath}`);
 
     const modelReadMe = this.createModel({
       name: 'qwen.qwen3-coder-30b-a3b-v1:0',
