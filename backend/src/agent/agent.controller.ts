@@ -13,7 +13,7 @@ export class AgentController {
   constructor(
     private readonly agentService: AgentService,
     @InjectModel(Report.name) private reportModel: Model<Report>,
-  ) {}
+  ) { }
 
   @Get('results')
   async findReports() {
@@ -33,31 +33,27 @@ export class AgentController {
 
       if (files.length === 0) return 'Nessun file di report trovato';
 
-      const latestFile = path.join(reportsDir, files[0]);
+      const latestFile = path.join(reportsDir, files.at(-1)!);
 
       // 2. Leggi e Parsea il JSON di Semgrep
       const rawData = fs.readFileSync(latestFile, 'utf-8');
       const semgrepData = JSON.parse(rawData);
 
-      const results = semgrepData.results;
-
-      if (!results || results.length === 0) {
-        return 'Il report è valido ma non contiene vulnerabilità (results vuoto).';
-      }
-      //Prendiamo la prima vulnerabilità trovata
-      const firstIssue = results[0];
-
       // Mappo i campi dati del json
       const newReport = new this.reportModel({
-        name: firstIssue.check_id,
-        description: firstIssue.extra?.message || 'Nessuna descrizione',
+        name: Math.ceil(Math.random() * 1000).toString(),
+        description: 'Nessuna descrizione',
         date: date,
         report: report,
       });
 
       await newReport.save();
+
+      console.log("Report:");
+      console.log(newReport.report);
     } catch (e) {
-      return e instanceof Error ? e.message : 'Errore';
+      const errorMessage = e instanceof Error ? e.message : 'Errore';
+      return errorMessage;
     }
     return { url: `../agent/results` };
   }
