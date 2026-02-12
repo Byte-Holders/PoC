@@ -46,6 +46,8 @@ export class AgentController {
         report: report,
       });
 
+      console.log("Before save");
+
       await newReport.save();
 
       console.log("Report:");
@@ -54,6 +56,7 @@ export class AgentController {
       const errorMessage = e instanceof Error ? e.message : 'Errore';
       return errorMessage;
     }
+
     return { url: `../agent/results` };
   }
 
@@ -72,3 +75,24 @@ export class AgentController {
     return await this.agentService.fetchLanguages({ repo: 'PoC', owner: 'Byte-Holders' });
   }
 }
+
+const dummy = `# Analisi Report: Vulnerabilità di Sicurezza
+
+Il tool ha fornito informazioni dettagliate sulle potenziali vulnerabilità di sicurezza presenti nei file del **backend** e **frontend**. Questo documento analizza il contenuto del report, evidenziando le problematiche più critiche e spiegando le conseguenze che potrebbero derivarne per la sicurezza dell'applicazione.
+
+## Risultati Principali
+Qua ci vanno i **risultati principali**
+
+### Un primo risultati
+
+**Problema**: spiegazione del problema
+
+**Conseguenze**:
+- conseguenza 1
+- conseguenza 2
+- *conseguenza 3*
+
+**Soluzione raccomandata**:
+\`Esempio soluzione\`
+
+`;

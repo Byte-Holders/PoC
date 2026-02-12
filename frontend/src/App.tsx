@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import "./App.css";
-import CloneRepo from "./CloneRepo";
+import markdown from "@wcj/markdown-to-html";
+// import CloneRepo from "./CloneRepo";
 
 interface Repository {
     _id: string;
@@ -28,7 +29,7 @@ function App() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ repoLink: selectedRepo })
         })
-            .then((res) => res.text().then((text) => setConn(text)))
+            .then((res) => res.text().then((text) => setConn(JSON.parse(text)[0].report)))
             .catch(() => setConn("Errore nella richiesta"));
     };
 
@@ -143,7 +144,7 @@ function App() {
                     Avvio Scan
                 </button>
                 <h2>Ecco il Report!</h2>
-                <p>{conn}</p>
+                <p dangerouslySetInnerHTML={{__html: markdown(conn)}} style={{all: "initial", color: "white"}}></p>
             </div>
             {/*<div className="card">
             <CloneRepo />
