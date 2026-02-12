@@ -1,6 +1,5 @@
-import { Body, Controller, Get, Post, Query, Redirect } from "@nestjs/common";
+import { Body, Controller, Get, Post, Redirect } from "@nestjs/common";
 import { AgentService } from "./agent.service";
-import * as mongoose from "mongoose";
 import * as path from 'path';
 import * as fs from 'fs';
 import { InjectModel } from '@nestjs/mongoose';
@@ -61,5 +60,15 @@ export class AgentController {
   @Post('clone')
   cloneRepo(@Body('target') url: string) {
     this.agentService.cloneRepo(url);
+  }
+
+  @Get('authTest')
+  async octokitTest() {
+    return await this.agentService.authTest();
+  }
+
+  @Get('languages')
+  async getLanguages() {
+    return await this.agentService.fetchLanguages({ repo: 'PoC', owner: 'Byte-Holders' });
   }
 }

@@ -5,7 +5,6 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { Report, ReportSchema } from '../mongo/mongo.schema';
 import { Coverage } from 'src/test_coverage/coverage.schema';
 import { CoverageModule } from 'src/test_coverage/coverage.module';
-// import { HttpModule } from '@nestjs/axios';
 
 @Module({
   imports: [
@@ -18,5 +17,5 @@ import { CoverageModule } from 'src/test_coverage/coverage.module';
   providers: [AgentService],
   exports: [AgentService],
 })
-export class AgentModule {}
+export class AgentModule { }
 

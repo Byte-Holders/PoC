@@ -9,6 +9,7 @@ import git from 'isomorphic-git';
 // import per isomorphic-git (clone)
 import http from 'isomorphic-git/http/node';
 // import fs from 'fs'; (sopra)
+import { Octokit } from 'octokit';
 import { CoverageService } from '../test_coverage/coverage.service';
 
 import dotenv from 'dotenv';
@@ -32,7 +33,9 @@ export type ModelCreateInfo = {
 export class AgentService {
   constructor(
     private readonly coverageService: CoverageService
-  ) { }
+  ) {
+    this.octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
+  }
 
   async runSemgrepScan(repoPath: string): Promise<string | unknown> {
     const dateStr = new Date().toISOString().replace(/[:.]/g, '-');
@@ -131,13 +134,28 @@ export class AgentService {
         console.log(`Analisi README generata: ${analisiREADME}`);
         return { analysis: state.analysis + "\n\nAnalisi del README:\n" + analisiREADME };
       })
+      .addNode('get_languages', async (state) => {
+        // per ora non modifico AgentState
+        const languages = await this.fetchLanguages({ owner: repoOwner, repo: repoPath });
+
+        const stringified = languages
+          .map((value: (string | number | undefined)[]) => `${value[0]}: ${value[1]}`)
+          .reduce((prev: string, curr: string) => `${prev}\n${curr}`);
+
+        const response = `**Linguaggi:**\n${stringified}`;
+
+        console.log(response);
+
+        return { analysis: `${state.analysis + response}` };
+      })
 
       // --- Definizione dei collegamenti ---
       .addEdge(START, 'run_scan')
       .addEdge('run_scan', 'run_coverage') // Sequenziale
       .addEdge('run_coverage', 'ai_analysis')
       .addEdge('ai_analysis', 'readme_analysis')
-      .addEdge('readme_analysis', END);
+      .addEdge('readme_analysis', 'get_languages')
+      .addEdge('get_languages', END);
 
     const app = workflow.compile();
 
@@ -195,6 +213,7 @@ export class AgentService {
       url,
       singleBranch: true, // Opzionale: velocizza il clone
       depth: 1,           // Opzionale: scarica solo l'ultimo commit (più veloce)
+      // ref: 'develop',
     });
 
     console.log(`Repo clonata con successo in ${clonePath}`);
@@ -211,4 +230,27 @@ export class AgentService {
       maxTokens: modelCI.maxTokens || 1000,
     });
   }
+
+  async authTest() {
+    const { data: { login } } = await this.octokit.rest.users.getAuthenticated();
+    return login;
+  }
+
+  async fetchLanguages({ owner, repo }: { owner: string, repo: string }) {
+    console.log(`Owner: ${owner}`);
+    console.log(`Repo: ${repo}`);
+    const languages = await this.octokit.rest.repos.listLanguages({ repo, owner });
+    console.log(languages);
+
+    const total = Object.values(languages.data).reduce((prev, curr) => curr + prev);
+    console.log(`Total ${total}`);
+
+    const result = Object.entries(languages.data).map((langInfo: [string, number]) => {
+      return [langInfo.at(0), langInfo.at(1) as number / total * 100];
+    })
+
+    return result;
+  }
+
+  private readonly octokit: Octokit;
 }
