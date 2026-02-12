@@ -85,6 +85,7 @@ export class AgentService {
     // 1. Aspetta il clone e ottieni il path pulito
     const fullRepoPath = await this.cloneRepo(repoLink);
     const repoName = path.basename(fullRepoPath);
+    const repoOwner = repoLink.split('/').at(-2)!;
 
     const model = this.createModel({ name: 'qwen.qwen3-coder-30b-a3b-v1:0' });
 
@@ -136,7 +137,7 @@ export class AgentService {
       })
       .addNode('get_languages', async (state) => {
         // per ora non modifico AgentState
-        const languages = await this.fetchLanguages({ owner: repoOwner, repo: repoPath });
+        const languages = await this.fetchLanguages({ owner: repoOwner, repo: repoName });
 
         const stringified = languages
           .map((value: (string | number | undefined)[]) => `${value[0]}: ${value[1]}`)
