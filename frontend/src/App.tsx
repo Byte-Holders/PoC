@@ -29,7 +29,7 @@ function App() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ repoLink: selectedRepo })
         })
-            .then((res) => res.text().then((text) => setConn(text)))
+            .then((res) => res.text().then((text) => setConn(JSON.parse(text)[0].report)))
             .catch(() => setConn("Errore nella richiesta"));
     };
 

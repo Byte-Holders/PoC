@@ -56,7 +56,7 @@ export class AgentService {
       console.log(`Scansione in corso su: ${projectRoot}`);
 
       execSync(
-        `semgrep scan ${projectRoot} --config auto --json --output ${reportPath} --exclude=node_modules --exclude=reports --exclude=dist --quiet`,
+        `semgrep scan ${projectRoot} --config auto --json --output ${reportPath} --exclude=node_modules --exclude=reports --exclude=dist --quiet --no-git-ignore`,
         {
           stdio: 'inherit',
           encoding: 'utf-8',
@@ -130,13 +130,13 @@ export class AgentService {
     });
   }
 
-   cloneRepo(url: string) {
+  cloneRepo(url: string) {
     console.log(`Ricevuto: ${url}`);
     const clonePath: string = path.join('/usr/src/repos', url.split('/').findLast(() => true)!);
 
     console.log(`Esecuzione git clone, verrà salvata in ${clonePath}`);
 
-     git.clone({
+    git.clone({
       http,
       fs,
       dir: clonePath,

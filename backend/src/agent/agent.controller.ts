@@ -21,8 +21,8 @@ export class AgentController {
   }
 
   @Post('scan')
+  @Redirect()
   async getScan(@Body() body: { repoLink: string }) {
-    return dummy;
     const date = new Date();
     const report = await this.agentService.execute(body.repoLink);
     const reportsDir = path.resolve('./reports');
@@ -39,20 +39,10 @@ export class AgentController {
       const rawData = fs.readFileSync(latestFile, 'utf-8');
       const semgrepData = JSON.parse(rawData);
 
-      const results = semgrepData.results;
-
-      if (!results || results.length === 0) {
-        return 'Il report è valido ma non contiene vulnerabilità (results vuoto).';
-      }
-      //Prendiamo la prima vulnerabilità trovata
-      const firstIssue = results[0];
-
       // Mappo i campi dati del json
       const newReport = new this.reportModel({
-        // name: firstIssue.check_id,
-        name: 'Placeholder name',
-        // description: firstIssue.extra?.message || 'Nessuna descrizione',
-        description: 'Placeholder description',
+        name: Math.ceil(Math.random() * 1000).toString(),
+        description: 'Nessuna descrizione',
         date: date,
         report: report,
       });
@@ -61,12 +51,13 @@ export class AgentController {
 
       await newReport.save();
 
-      return newReport.report;
+      console.log("Report:");
+      console.log(newReport.report);
     } catch (e) {
       return e instanceof Error ? e.message : 'Errore';
     }
-    // unreachable
-    // return { url: `../agent/results` };
+
+    return { url: `../agent/results` };
   }
 
   @Post('clone')
