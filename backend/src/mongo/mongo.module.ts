@@ -4,6 +4,7 @@ import { AgentService } from '../agent/agent.service';
 import { MongoController } from './mongo.controller';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Repository, RepositorySchema } from './mongo.schema';
+import { AgentModule } from 'src/agent/agent.module';
 
 @Module({
   imports: [
@@ -11,8 +12,9 @@ import { Repository, RepositorySchema } from './mongo.schema';
     MongooseModule.forFeature([
       { name: Repository.name, schema: RepositorySchema },
     ]),
+    AgentModule,
   ],
-  providers: [MongoService, AgentService],
+  providers: [MongoService],
   controllers: [MongoController],
 })
 export class MongoModule {}

@@ -1,6 +1,5 @@
-import { Body, Controller, Get, Post, Query, Redirect } from "@nestjs/common";
+import { Body, Controller, Get, Post, Redirect } from "@nestjs/common";
 import { AgentService } from "./agent.service";
-import * as mongoose from "mongoose";
 import * as path from 'path';
 import * as fs from 'fs';
 import { InjectModel } from '@nestjs/mongoose';
@@ -33,7 +32,7 @@ export class AgentController {
 
       if (files.length === 0) return 'Nessun file di report trovato';
 
-      const latestFile = path.join(reportsDir, files[0]);
+      const latestFile = path.join(reportsDir, files.at(-1)!);
 
       // 2. Leggi e Parsea il JSON di Semgrep
       const rawData = fs.readFileSync(latestFile, 'utf-8');
@@ -54,7 +53,8 @@ export class AgentController {
       console.log("Report:");
       console.log(newReport.report);
     } catch (e) {
-      return e instanceof Error ? e.message : 'Errore';
+      const errorMessage = e instanceof Error ? e.message : 'Errore';
+      return errorMessage;
     }
 
     return { url: `../agent/results` };
@@ -63,6 +63,16 @@ export class AgentController {
   @Post('clone')
   cloneRepo(@Body('target') url: string) {
     this.agentService.cloneRepo(url);
+  }
+
+  @Get('authTest')
+  async octokitTest() {
+    return await this.agentService.authTest();
+  }
+
+  @Get('languages')
+  async getLanguages() {
+    return await this.agentService.fetchLanguages({ repo: 'PoC', owner: 'Byte-Holders' });
   }
 }
 

@@ -9,6 +9,8 @@ import git from 'isomorphic-git';
 // import per isomorphic-git (clone)
 import http from 'isomorphic-git/http/node';
 // import fs from 'fs'; (sopra)
+import { Octokit } from 'octokit';
+import { CoverageService } from '../test_coverage/coverage.service';
 
 import dotenv from 'dotenv';
 
@@ -16,6 +18,7 @@ dotenv.config();
 
 const AgentState = Annotation.Root({
   reportPath: Annotation<string | unknown>(),
+  coverageData: Annotation<any>(),
   analysis: Annotation<string>(),
 });
 
@@ -28,6 +31,12 @@ export type ModelCreateInfo = {
 
 @Injectable()
 export class AgentService {
+  constructor(
+    private readonly coverageService: CoverageService
+  ) {
+    this.octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
+  }
+
   async runSemgrepScan(repoPath: string): Promise<string | unknown> {
     const dateStr = new Date().toISOString().replace(/[:.]/g, '-');
     const reportPath = path.resolve(`./reports/test_scan_${dateStr}.json`);
@@ -73,50 +82,143 @@ export class AgentService {
   // workflow
 
   async execute(repoLink: string) {
-    const repoPath = repoLink.split('/').pop()!;
-    if (repoPath.length <= 0) {
-      return console.log('Nessuna repo trovata.');
-    }
-    const model = this.createModel({
-      name: 'qwen.qwen3-coder-30b-a3b-v1:0',
-    });
-    const workflow = new StateGraph(AgentState)
+    // 1. Aspetta il clone e ottieni il path pulito
+    const fullRepoPath = await this.cloneRepo(repoLink);
+    const repoName = path.basename(fullRepoPath);
+    const repoOwner = repoLink.split('/').at(-2)!;
 
-      // Nodo 1: Esegue la tua scansione
+    const model = this.createModel({ name: 'qwen.qwen3-coder-30b-a3b-v1:0' });
+
+    const workflow = new StateGraph(AgentState)
       .addNode('run_scan', async () => {
-        const pathGenerated = await this.runSemgrepScan(repoPath);
+        // Usa il repoName senza .git
+        const pathGenerated = await this.runSemgrepScan(repoName);
         return { reportPath: pathGenerated };
       })
+      .addNode('run_coverage', async () => {
+        console.log(`Avvio scansione Test Coverage in: ${fullRepoPath}`);
+        try {
+          // Passa il path assoluto pulito
+          const coverage = await this.coverageService.runTestsAndUpload(fullRepoPath);
+          return { coverageData: coverage };
+        } catch (err) {
+          console.error("Fallimento coverage, procedo comunque...");
+          return { coverageData: { error: "Non disponibile o fallito" } };
+        }
+      })
 
+      // Nodo 3: AI Analysis
       .addNode('ai_analysis', async (state) => {
-        // non gestisco errori
-        const fullJsonRaw = fs.readFileSync(
-          state.reportPath as string,
-          'utf-8',
-        );
+        const semgrepRaw = fs.readFileSync(state.reportPath as string, 'utf-8');
 
-        console.log('Chiamata al modello');
+        // Prepariamo un contesto che includa sia Semgrep che Coverage
+        const coverageContext = JSON.stringify(state.coverageData, null, 2);
+
         const response = await model.invoke([
           new SystemMessage(
-            `Crea un report dettagliato e discorsivo(non elenco puntato) del file report restituito da Semgrep, facendo notare le vulnerabilita' piu critiche`,
+            `Sei un esperto di sicurezza e qualità del codice. 
+                        Analizza il report Semgrep (sicurezza) e i dati di Test Coverage (qualità).
+                        Crea un report discorsivo che metta in relazione i due aspetti.`
           ),
           new HumanMessage(
-            `Ecco il file JSON integrale della scansione: \n\n ${fullJsonRaw}`,
+            `Dati Semgrep: \n${semgrepRaw}\n\n 
+                        Dati Coverage: \n${coverageContext}`
           ),
         ]);
-
-        console.log(`Riassunto generato: ${response.content as string}`);
 
         return { analysis: response.content as string };
       })
 
+      // Nodo 4: Scan README
+      .addNode('readme_analysis', async (state: typeof AgentState.State) => {
+        const analisiREADME = await this.scanREADME(fullRepoPath);
+        console.log(`Analisi README generata: ${analisiREADME}`);
+        return { analysis: state.analysis + "\n\nAnalisi del README:\n" + analisiREADME };
+      })
+      .addNode('get_languages', async (state) => {
+        // per ora non modifico AgentState
+        const languages = await this.fetchLanguages({ owner: repoOwner, repo: repoName });
+
+        const stringified = languages
+          .map((value: (string | number | undefined)[]) => `${value[0]}: ${value[1]}`)
+          .reduce((prev: string, curr: string) => `${prev}\n${curr}`);
+
+        const response = `**Linguaggi:**\n${stringified}`;
+
+        console.log(response);
+
+        return { analysis: `${state.analysis + response}` };
+      })
+
+      // --- Definizione dei collegamenti ---
       .addEdge(START, 'run_scan')
-      .addEdge('run_scan', 'ai_analysis')
-      .addEdge('ai_analysis', END);
+      .addEdge('run_scan', 'run_coverage') // Sequenziale
+      .addEdge('run_coverage', 'ai_analysis')
+      .addEdge('ai_analysis', 'readme_analysis')
+      .addEdge('readme_analysis', 'get_languages')
+      .addEdge('get_languages', END);
 
     const app = workflow.compile();
 
     return (await app.invoke({})).analysis;
+  }
+
+  async scanREADME(repoPath: string) {
+
+    console.log(`Inizio analisi README in: ${repoPath}`);
+
+    const modelReadMe = this.createModel({
+      name: 'qwen.qwen3-coder-30b-a3b-v1:0',
+    });
+
+    const listaFile = fs.readdirSync(repoPath);
+
+    if (!listaFile.includes("README.md")) {
+      return "\n\nIl repository non contiene un file README.md, quindi non è possibile analizzarlo.";
+    }
+
+    const readMePath = path.join(repoPath, "README.md");
+
+    const readMecontent = fs.readFileSync(readMePath, "utf-8");
+
+    const analisiREADME = await modelReadMe.invoke([
+      new SystemMessage("sei un esperto valutatore di documentazione, devi valutare i README dei repository, individuandone le criticità, rispondi senza saluti iniziali, vai dritto al punto"),
+      new HumanMessage(`ecco il contenuto del README:\n${readMecontent}`)
+    ]);
+
+    return analisiREADME.content;
+  }
+
+
+  // workflow
+
+  async cloneRepo(url: string): Promise<string> {
+    console.log(`Ricevuto: ${url}`);
+
+    const repoName = url.split('/').pop()!.replace(/\.git$/, '');
+    const clonePath = path.join('/usr/src/repos', repoName);
+
+    console.log(`Esecuzione git clone in ${clonePath}`);
+
+    // Se la cartella esiste già, non clonare di nuovo
+    if (fs.existsSync(clonePath)) {
+      console.log('Repo già presente localmente.');
+      return clonePath;
+    }
+
+    // AGGIUNGI AWAIT qui per bloccare l'esecuzione finché non ha finito
+    await git.clone({
+      http,
+      fs,
+      dir: clonePath,
+      url,
+      singleBranch: true, // Opzionale: velocizza il clone
+      depth: 1,           // Opzionale: scarica solo l'ultimo commit (più veloce)
+      // ref: 'develop',
+    });
+
+    console.log(`Repo clonata con successo in ${clonePath}`);
+    return clonePath;
   }
 
   private createModel(modelCI: ModelCreateInfo) {
@@ -130,19 +232,26 @@ export class AgentService {
     });
   }
 
-  cloneRepo(url: string) {
-    console.log(`Ricevuto: ${url}`);
-    const clonePath: string = path.join('/usr/src/repos', url.split('/').findLast(() => true)!);
-
-    console.log(`Esecuzione git clone, verrà salvata in ${clonePath}`);
-
-    git.clone({
-      http,
-      fs,
-      dir: clonePath,
-      url,
-    });
-
-    console.log(`Repo clonata in ${clonePath}`);
+  async authTest() {
+    const { data: { login } } = await this.octokit.rest.users.getAuthenticated();
+    return login;
   }
+
+  async fetchLanguages({ owner, repo }: { owner: string, repo: string }) {
+    console.log(`Owner: ${owner}`);
+    console.log(`Repo: ${repo}`);
+    const languages = await this.octokit.rest.repos.listLanguages({ repo, owner });
+    console.log(languages);
+
+    const total = Object.values(languages.data).reduce((prev, curr) => curr + prev);
+    console.log(`Total ${total}`);
+
+    const result = Object.entries(languages.data).map((langInfo: [string, number]) => {
+      return [langInfo.at(0), langInfo.at(1) as number / total * 100];
+    })
+
+    return result;
+  }
+
+  private readonly octokit: Octokit;
 }
