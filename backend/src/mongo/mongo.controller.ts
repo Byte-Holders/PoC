@@ -18,4 +18,8 @@ export class MongoController {
     this.AgentService.cloneRepo(body.link);
     return this.MongoService.addRepo(body.name, body.link);
   }
+  @Post('find_report')
+  async findReports(@Body() body: { name: string }) {
+    return this.MongoService.findReports(body.name);
+  }
 }

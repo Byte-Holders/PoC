@@ -14,18 +14,13 @@ export class AgentController {
     @InjectModel(Report.name) private reportModel: Model<Report>,
   ) { }
 
-  @Get('results')
-  async findReports() {
-    return this.reportModel.find().sort({ date: -1 }).limit(1);
-  }
 
   @Post('scan')
-  @Redirect()
   async getScan(@Body() body: { repoLink: string }) {
     const date = new Date();
+    const repoName = path.basename(body.repoLink, '.git');
     const report = await this.agentService.execute(body.repoLink);
-    const reportsDir = path.resolve('./reports');
-
+    const reportsDir = path.resolve('./reports/' + repoName);
     try {
       if (!fs.existsSync(reportsDir)) return 'Cartella reports non trovata';
       const files = fs.readdirSync(reportsDir);
@@ -40,7 +35,7 @@ export class AgentController {
 
       // Mappo i campi dati del json
       const newReport = new this.reportModel({
-        name: Math.ceil(Math.random() * 1000).toString(),
+        name: repoName,
         description: 'Nessuna descrizione',
         date: date,
         report: report,
@@ -56,8 +51,7 @@ export class AgentController {
       const errorMessage = e instanceof Error ? e.message : 'Errore';
       return errorMessage;
     }
-
-    return { url: `../agent/results` };
+    return this.reportModel.find().sort({ date: -1 }).limit(1);
   }
 
   @Post('clone')
