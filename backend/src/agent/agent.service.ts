@@ -87,7 +87,7 @@ export class AgentService {
     const repoName = path.basename(fullRepoPath);
     const repoOwner = repoLink.split('/').at(-2)!;
 
-    const model = this.createModel({ name: 'qwen.qwen3-coder-30b-a3b-v1:0' });
+    const model = this.createModel({ name: 'deepseek.v3.2' });
 
     const workflow = new StateGraph(AgentState)
       .addNode('run_scan', async () => {
@@ -168,7 +168,7 @@ export class AgentService {
     console.log(`Inizio analisi README in: ${repoPath}`);
 
     const modelReadMe = this.createModel({
-      name: 'qwen.qwen3-coder-30b-a3b-v1:0',
+      name: 'deepseek.v3.2',
     });
 
     const listaFile = fs.readdirSync(repoPath);

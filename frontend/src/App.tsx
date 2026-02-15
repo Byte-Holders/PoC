@@ -144,9 +144,11 @@ function App() {
                     Avvio Scan
                 </button>
                 <h2>Ecco il Report!</h2>
-                <ReactMarkdown>
-                    {conn}
-                </ReactMarkdown>
+                <div style={{ textAlign: 'left' }}>
+                    <ReactMarkdown>
+                        {conn}
+                    </ReactMarkdown>
+                </div>
             </div>
             {/*<div className="card">
             <CloneRepo />
