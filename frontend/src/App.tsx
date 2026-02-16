@@ -135,7 +135,7 @@ function App() {
                 >
                     <option value="">Seleziona Repository</option>
                     {repositories.map((repo) => (
-                        <option key={repo._id} value={repo.name}>
+                        <option key={repo._id} value={repo.link}>
                             {repo.name}
                         </option>
                     ))}
