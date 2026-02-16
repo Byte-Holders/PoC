@@ -78,7 +78,7 @@ function App() {
         fetch("http://localhost:3000/mongo/find_report", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name: selectedRepo })
+            body: JSON.stringify({ link: selectedRepo })
         })
             .then((res) => res.json())
             .then((data: Report[]) => {
