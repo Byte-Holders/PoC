@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import "./App.css";
-import markdown from "@wcj/markdown-to-html";
+import ReactMarkdown from 'react-markdown';
+// import CloneRepo from "./CloneRepo";
 
 interface Repository {
     _id: string;
@@ -182,7 +183,11 @@ function App() {
             <div>
                 <button onClick={startScan}>Avvio Scan</button>
                 <h2>Ecco il Report!</h2>
-                <p dangerouslySetInnerHTML={{__html: markdown(conn)}} style={{all: "initial", color: "white"}}></p>
+                <div style={{ textAlign: 'left' }}>
+                    <ReactMarkdown>
+                        {conn}
+                    </ReactMarkdown>
+                </div>
             </div>
         </>
     );
