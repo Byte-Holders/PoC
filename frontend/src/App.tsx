@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import "./App.css";
-import markdown from "@wcj/markdown-to-html";
+import ReactMarkdown from 'react-markdown';
 // import CloneRepo from "./CloneRepo";
 
 interface Repository {
@@ -9,21 +9,47 @@ interface Repository {
     link: string;
 }
 
+interface Report {
+    _id: string;
+    name: string;
+    description: string;
+    report : string;
+    date: Date;
+}
+
 function App() {
     const [conn, setConn] = useState("");
     const [repositories, setRepositories] = useState<Repository[]>([]);
     const [selectedRepo, setSelectedRepo] = useState<string>("");
+    const [reports, setReports] = useState<Report[]>([]);
+    const [selectedReport, setSelectedReport] = useState<string>("");
 
-    // Stati per la modale
+
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [newRepoLink, setNewRepoLink] = useState("");
     const [newRepoName, setNewRepoName] = useState("");
+
+
+    useEffect(() => {
+        fetchRepos();
+    }, []);
+
+
+    useEffect(() => {
+        if (selectedRepo) {
+            console.log("Cambio repo rilevato, cerco i report per:", selectedRepo);
+            fetchReports();
+        } else {
+            setReports([]);
+            setConn("");
+        }
+    }, [selectedRepo]);
+
 
     const startScan = () => {
         if(!selectedRepo) return alert("Seleziona una repo!");
         setConn("Scansione in corso... attendere...");
 
-        console.log("Invio scan per:", selectedRepo);
         fetch("http://localhost:3000/agent/scan", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -34,31 +60,43 @@ function App() {
     };
 
     const fetchRepos = () => {
-        fetch("http://localhost:3000/mongo/find_repo", { method: "POST" })
+        fetch("http://localhost:3000/mongo/find_repo", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({})
+        })
             .then((res) => res.json())
             .then((data: Repository[]) => {
-                console.log("DATI RICEVUTI DAL SERVER:", data);
                 setRepositories(data);
-                if (data.length > 0 && !selectedRepo) {
-                    setSelectedRepo(data[0].link);
-                }
             })
             .catch((err) => console.error("Errore repo:", err));
     };
 
-    useEffect(() => {
-        fetchRepos();
-    }, []);
+    const fetchReports = () => {
+        // Pulisce la visualizzazione precedente
+        setConn("");
+
+        fetch("http://localhost:3000/mongo/find_report", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ link: selectedRepo })
+        })
+            .then((res) => res.json())
+            .then((data: Report[]) => {
+                setReports(data);
+                // Reset della selezione report
+                setSelectedReport("");
+            })
+            .catch((err) => console.error("Errore report:", err));
+    };
 
     const addRepos = async () => {
-        // 1. Validazione Frontend
         if (!newRepoName || !newRepoLink) {
             alert("Devi inserire sia il nome che il link!");
             return;
         }
 
         const newRepo = { name: newRepoName, link: newRepoLink };
-        console.log("Sto inviando:", newRepo); // DEBUG
 
         try {
             const res = await fetch("http://localhost:3000/mongo/Add_repo", {
@@ -67,15 +105,12 @@ function App() {
                 body: JSON.stringify(newRepo)
             });
 
-
-            // 2. Controllo risposta (res.ok è true per 200-299)
             if (res.ok) {
                 alert("Salvataggio riuscito!");
                 fetchRepos();
+                handleCloseModal(); // Chiudi modale dopo successo
             } else {
-                // Leggiamo il messaggio di errore dal server
                 const errorText = await res.text();
-                console.error("Errore Backend:", errorText);
                 alert(`Errore dal server: ${res.status} - ${errorText}`);
             }
         } catch (error) {
@@ -99,36 +134,43 @@ function App() {
                     value={selectedRepo}
                     onChange={(e) => setSelectedRepo(e.target.value)}
                 >
-                    {repositories.length > 0 ? (
-                        repositories.map((repo) => (
-                            <option key={repo._id} value={repo.link}>
-                                {repo.name}
-                            </option>
-                        ))
-                    ) : (
-                        <option value="">Caricamento...</option>
-                    )}
+                    <option value="">Seleziona Repository</option>
+                    {repositories.map((repo) => (
+                        <option key={repo._id} value={repo.link}>
+                            {repo.name}
+                        </option>
+                    ))}
                 </select>
-                {/* Bottone per aprire la modale */}
                 <button className="btn-add" onClick={() => setIsModalOpen(true)} style={{marginLeft: '10px'}}>+</button>
+            </div>
+
+            <div id="report-selection" className='repo-selection'>
+                <label htmlFor="report-select">Reports: </label>
+                <select
+                    id="report-select"
+                    value={selectedReport}
+                    onChange={(e) => {
+                        const val = e.target.value;
+                        setSelectedReport(val);
+                        if(val) setConn(val);
+                        else setConn("");
+                    }}
+                >
+                    <option value="">Seleziona Report</option>
+                    {reports.map((r) => (
+                        <option key={r._id} value={r.report}>
+                            {new Date(r.date).toLocaleString('it-IT')}
+                        </option>
+                    ))}
+                </select>
             </div>
 
             {isModalOpen && (
                 <div className="modal-overlay">
                     <div className="modal-content">
                         <h3>Aggiungi Repository</h3>
-                        <input
-                            type="text"
-                            placeholder="Nome (es. Firefox)"
-                            value={newRepoName}
-                            onChange={(e) => setNewRepoName(e.target.value)}
-                        />
-                        <input
-                            type="text"
-                            placeholder="Link Git (https://...)"
-                            value={newRepoLink}
-                            onChange={(e) => setNewRepoLink(e.target.value)}
-                        />
+                        <input type="text" placeholder="Nome" value={newRepoName} onChange={(e)=>setNewRepoName(e.target.value)}/>
+                        <input type="text" placeholder="Link" value={newRepoLink} onChange={(e)=>setNewRepoLink(e.target.value)}/>
                         <div className="modal-actions">
                             <button className="btn-cancel" onClick={handleCloseModal}>Annulla</button>
                             <button className="btn-save" onClick={addRepos}>Salva</button>
@@ -137,18 +179,16 @@ function App() {
                 </div>
             )}
 
-            {/* CONTENUTO CENTRALE */}
             <h1>PoC - Byte Holders</h1>
             <div>
-                <button onClick={startScan}>
-                    Avvio Scan
-                </button>
+                <button onClick={startScan}>Avvio Scan</button>
                 <h2>Ecco il Report!</h2>
-                <p dangerouslySetInnerHTML={{__html: markdown(conn)}} style={{all: "initial", color: "white"}}></p>
+                <div style={{ textAlign: 'left' }}>
+                    <ReactMarkdown>
+                        {conn}
+                    </ReactMarkdown>
+                </div>
             </div>
-            {/*<div className="card">
-            <CloneRepo />
-            </div>*/}
         </>
     );
 }

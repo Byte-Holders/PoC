@@ -39,7 +39,9 @@ export class AgentService {
 
   async runSemgrepScan(repoPath: string): Promise<string | unknown> {
     const dateStr = new Date().toISOString().replace(/[:.]/g, '-');
-    const reportPath = path.resolve(`./reports/test_scan_${dateStr}.json`);
+
+    const reportPath = path.resolve(`./reports/` + repoPath +`/test_scan_${dateStr}.json`);
+    const projectRoot = '/usr/src/repos/' + repoPath;
 
     console.log('Avvio test Semgrep...');
 
@@ -60,8 +62,6 @@ export class AgentService {
         throw new Error('Semgrep non e stato trovato');
       }
 
-      //Avvia la scansione su projectRoot che pero si cambia easy se serve fare la scansione su qualcosa di diverso.
-      const projectRoot = '/usr/src/repos/' + repoPath;
       console.log(`Scansione in corso su: ${projectRoot}`);
 
       execSync(
@@ -87,7 +87,7 @@ export class AgentService {
     const repoName = path.basename(fullRepoPath);
     const repoOwner = repoLink.split('/').at(-2)!;
 
-    const model = this.createModel({ name: 'qwen.qwen3-coder-30b-a3b-v1:0' });
+    const model = this.createModel({ name: 'deepseek.v3.2' });
 
     const workflow = new StateGraph(AgentState)
       .addNode('run_scan', async () => {
@@ -113,7 +113,6 @@ export class AgentService {
 
         // Prepariamo un contesto che includa sia Semgrep che Coverage
         const coverageContext = JSON.stringify(state.coverageData, null, 2);
-
         const response = await model.invoke([
           new SystemMessage(
             `Sei un esperto di sicurezza e qualità del codice. 
@@ -125,7 +124,7 @@ export class AgentService {
                         Dati Coverage: \n${coverageContext}`
           ),
         ]);
-
+        console.log(response)
         return { analysis: response.content as string };
       })
 
@@ -159,7 +158,6 @@ export class AgentService {
       .addEdge('get_languages', END);
 
     const app = workflow.compile();
-
     return (await app.invoke({})).analysis;
   }
 
@@ -168,7 +166,7 @@ export class AgentService {
     console.log(`Inizio analisi README in: ${repoPath}`);
 
     const modelReadMe = this.createModel({
-      name: 'qwen.qwen3-coder-30b-a3b-v1:0',
+      name: 'deepseek.v3.2',
     });
 
     const listaFile = fs.readdirSync(repoPath);
@@ -185,7 +183,6 @@ export class AgentService {
       new SystemMessage("sei un esperto valutatore di documentazione, devi valutare i README dei repository, individuandone le criticità, rispondi senza saluti iniziali, vai dritto al punto"),
       new HumanMessage(`ecco il contenuto del README:\n${readMecontent}`)
     ]);
-
     return analisiREADME.content;
   }
 
@@ -228,7 +225,7 @@ export class AgentService {
       model: modelCI.name,
       region: process.env.BEDROCK_AWS_REGION || modelCI.region || 'eu-north-1',
       temperature: modelCI.temperature || 0,
-      maxTokens: modelCI.maxTokens || 1000,
+      maxTokens: modelCI.maxTokens || 5000,
     });
   }
 

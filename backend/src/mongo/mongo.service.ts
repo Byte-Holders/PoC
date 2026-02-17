@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Repository } from './mongo.schema';
+import { Repository, Report } from './mongo.schema';
 import { Model } from 'mongoose';
 
 
@@ -8,6 +8,7 @@ import { Model } from 'mongoose';
 export class MongoService {
   constructor(
     @InjectModel(Repository.name) private repoModel: Model<Repository>,
+    @InjectModel(Report.name) private reportModel: Model<Report>,
   ) {}
 
   async findRepo() {
@@ -22,4 +23,12 @@ export class MongoService {
 
     return newRepo.save();
   }
+
+  async findReports(reponame: string){
+    return this.reportModel.find({name : reponame}).sort({ date: -1 });
+  }
+
+
+
+
 }

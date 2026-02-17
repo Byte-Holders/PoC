@@ -125,3 +125,10 @@ button:focus-visible {
   border-color: #646cff;
   box-shadow: 0 0 0 3px rgba(100, 108, 255, 0.25);
 }
+
+#report-selection{
+  position: absolute;
+  top: 2em;
+  margin-right: 0;
+  left: 130em;
+}
