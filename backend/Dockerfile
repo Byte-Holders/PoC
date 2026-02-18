@@ -1,6 +1,11 @@
 ARG NODE_VERSION=24.11.1
 FROM node:${NODE_VERSION}-alpine
 
+COPY --from=anchore/syft:latest /syft /usr/local/bin/syft
+
+COPY --from=anchore/grype:latest /grype /usr/local/bin/grype
+
+
 WORKDIR /usr/src/app
 
 #  Installazione Dipendenze di Sistema (Python & Semgrep) ---
@@ -24,6 +29,6 @@ COPY . .
 
 EXPOSE 3000
 
-RUN semgrep --version
+RUN semgrep --version && syft --version && grype --version
 
 CMD ["npm", "run", "start:dev"]
