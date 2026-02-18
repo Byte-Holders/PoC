@@ -176,16 +176,16 @@ export class AgentService {
 
             // Esegue Grype sull'SBOM e richiede output in JSON
             const grypeOutput = execSync(`grype sbom:${tempFile} -o json`, { encoding: 'utf-8' }).trim();
-            const report = JSON.parse(grypeOutput);
+            //const report = JSON.parse(grypeOutput);
 
             // Estrae le vulnerabilità con severità Critical o High
-            const criticalHigh = report.matches
+            //const criticalHigh = report.matches
                 //.filter(m => ['Critical', 'High'].includes(m.vulnerability.severity))
                 //.map(m => `${m.artifact.name}@${m.artifact.version} -> ${m.vulnerability.id} (${m.vulnerability.severity})`);
 
-            const summary = criticalHigh.length > 0
-                ? criticalHigh.join('\n')
-                : "Nessuna vulnerabilità critica o alta trovata.";
+            //const summary = criticalHigh.length > 0
+            //    ? criticalHigh.join('\n')
+            //    : "Nessuna vulnerabilità critica o alta trovata.";
 
             const response = await model.invoke([
               new SystemMessage(
@@ -194,10 +194,10 @@ export class AgentService {
                         Crea un report discorsivo che spieghi le vulnerabilita e che versione serve per sistemarle.`
               ),
               new HumanMessage(
-                  `Dati Grype: \n${report}\n\n`),
+                  `Dati Grype: \n${grypeOutput}\n\n`),
             ]);
             console.log(response)
-            return { analysis: `${state.analysis + response}` };
+            return { analysis: `${state.analysis + response.content}` };
           } catch (error) {
             console.error('Errore durante l\'analisi Grype:', error);
             throw new Error('Impossibile eseguire Grype sullo SBOM.');
