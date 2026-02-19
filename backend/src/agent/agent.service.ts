@@ -1,25 +1,24 @@
 import { Injectable } from '@nestjs/common';
 import path from 'path';
 import fs from 'fs';
-import { execSync } from 'child_process';
+import { execSync, spawn, exec} from 'child_process';
 import { StateGraph, START, END, Annotation } from '@langchain/langgraph';
 import { SystemMessage, HumanMessage } from '@langchain/core/messages';
 import { ChatBedrockConverse } from '@langchain/aws';
 import git from 'isomorphic-git';
-// import per isomorphic-git (clone)
 import http from 'isomorphic-git/http/node';
-// import fs from 'fs'; (sopra)
 import { Octokit } from 'octokit';
 import { CoverageService } from '../test_coverage/coverage.service';
-
 import dotenv from 'dotenv';
-
 dotenv.config();
+const os = require('os');
+
 
 const AgentState = Annotation.Root({
   reportPath: Annotation<string>(),
   coverageData: Annotation<any>(),
   analysis: Annotation<string>(),
+  sbom: Annotation<string>(),
   remediationResult: Annotation<string>(),
 });
 
@@ -187,14 +186,77 @@ export class AgentService {
         return { analysis: `${state.analysis + response}` };
       })
 
-      // --- Definizione dei collegamenti ---
-        .addEdge(START, 'run_scan')
-        .addEdge('run_scan', 'run_coverage')
-        .addEdge('run_coverage', 'remediation')
-        .addEdge('remediation', 'ai_analysis')
-        .addEdge('ai_analysis', 'readme_analysis')
-        .addEdge('readme_analysis', 'get_languages')
-        .addEdge('get_languages', END);
+        .addNode('dependencies', async (state) => {
+          console.log(`Analisi dipendenze della repo ${repoName} in corso...`);
+
+          try {
+            const dep = execSync(`syft dir:${fullRepoPath} -o json -q`).toString().trim();
+            return { sbom: dep };
+          } catch (error) {
+            console.log(`Errore durante l'analisi Syft`, error);
+            throw new Error('Impossibile analizzare la repository.');
+          }
+        })
+
+        .addNode('dependencies_vulnerability', async (state) => {
+          if (!state.sbom) {
+            throw new Error("Manca lo SBOM di syft");
+          }
+
+          console.log(`Analisi vulnerabilità su SBOM esistente con Grype...`);
+
+          let tempFile;
+          try {
+            // Crea un file temporaneo per salvare lo SBOM
+            tempFile = path.join(os.tmpdir(), `sbom-${Date.now()}.json`);
+            fs.writeFileSync(tempFile, state.sbom);
+
+            // Esegue Grype sull'SBOM e richiede output in JSON
+            const grypeOutput = execSync(`grype sbom:${tempFile} -o json`, { encoding: 'utf-8' }).trim();
+            //const report = JSON.parse(grypeOutput);
+
+            // Estrae le vulnerabilità con severità Critical o High
+            //const criticalHigh = report.matches
+                //.filter(m => ['Critical', 'High'].includes(m.vulnerability.severity))
+                //.map(m => `${m.artifact.name}@${m.artifact.version} -> ${m.vulnerability.id} (${m.vulnerability.severity})`);
+
+            //const summary = criticalHigh.length > 0
+            //    ? criticalHigh.join('\n')
+            //    : "Nessuna vulnerabilità critica o alta trovata.";
+
+            const response = await model.invoke([
+              new SystemMessage(
+                  `Sei un esperto di sicurezza e qualità del codice. 
+                        Analizza il report Grype sulle dipendenze e librerie.
+                        Crea un report discorsivo che spieghi le vulnerabilita e che versione serve per sistemarle.`
+              ),
+              new HumanMessage(
+                  `Dati Grype: \n${grypeOutput}\n\n`),
+            ]);
+            console.log(response)
+            return { analysis: `${state.analysis + response.content}` };
+          } catch (error) {
+            console.error('Errore durante l\'analisi Grype:', error);
+            throw new Error('Impossibile eseguire Grype sullo SBOM.');
+          } finally {
+            // rimuove il file temporaneo
+            if (tempFile && fs.existsSync(tempFile)) {
+              fs.unlinkSync(tempFile);
+            }
+          }
+        })
+
+
+        // --- Definizione dei collegamenti ---
+      .addEdge(START, 'run_scan')
+      .addEdge('run_scan', 'run_coverage')
+      .addEdge('run_coverage', 'ai_analysis')
+      .addEdge('ai_analysis', 'readme_analysis')
+      .addEdge('readme_analysis', 'remediation')
+      .addEdge('remediation', 'get_languages')
+      .addEdge('get_languages', 'dependencies')
+      .addEdge('dependencies', 'dependencies_vulnerability')
+      .addEdge('dependencies_vulnerability', END)
 
     const app = workflow.compile();
     return (await app.invoke({})).analysis;
