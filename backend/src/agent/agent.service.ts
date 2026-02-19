@@ -248,15 +248,15 @@ export class AgentService {
 
 
         // --- Definizione dei collegamenti ---
-      .addEdge(START, 'run_scan')
-      .addEdge('run_scan', 'run_coverage')
-      .addEdge('run_coverage', 'ai_analysis')
-      .addEdge('ai_analysis', 'readme_analysis')
-      .addEdge('readme_analysis', 'remediation')
-      .addEdge('remediation', 'get_languages')
-      .addEdge('get_languages', 'dependencies')
-      .addEdge('dependencies', 'dependencies_vulnerability')
-      .addEdge('dependencies_vulnerability', END)
+        .addEdge(START, 'run_scan')
+        .addEdge('run_scan', 'run_coverage')
+        .addEdge('run_coverage', 'remediation')
+        .addEdge('remediation', 'ai_analysis')
+        .addEdge('ai_analysis', 'readme_analysis')
+        .addEdge('readme_analysis', 'get_languages')
+        .addEdge('get_languages', 'dependencies')
+        .addEdge('dependencies', 'dependencies_vulnerability')
+        .addEdge('dependencies_vulnerability', END)
 
     const app = workflow.compile();
     return (await app.invoke({})).analysis;
