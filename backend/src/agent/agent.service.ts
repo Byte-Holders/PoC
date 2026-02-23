@@ -188,61 +188,37 @@ export class AgentService {
 
         .addNode('dependencies', async (state) => {
           console.log(`Analisi dipendenze della repo ${repoName} in corso...`);
-
           try {
             const dep = execSync(`syft dir:${fullRepoPath} -o json -q`).toString().trim();
-            return { sbom: dep };
-          } catch (error) {
-            console.log(`Errore durante l'analisi Syft`, error);
-            throw new Error('Impossibile analizzare la repository.');
-          }
-        })
+            const syftJson = JSON.parse(dep);
 
-        .addNode('dependencies_vulnerability', async (state) => {
-          if (!state.sbom) {
-            throw new Error("Manca lo SBOM di syft");
-          }
+            // Estrai solo i campi utili da ogni artifact
+            const artifacts = syftJson.artifacts?.map((a: any) => ({
+              name: a.name,
+              version: a.version,
+              type: a.type,
+              language: a.language ?? null,
+              licenses: a.licenses?.map((l: any) => l.value ?? l) ?? [],
+            })) ?? [];
 
-          console.log(`Analisi vulnerabilità su SBOM esistente con Grype...`);
-
-          let tempFile;
-          try {
-            // Crea un file temporaneo per salvare lo SBOM
-            tempFile = path.join(os.tmpdir(), `sbom-${Date.now()}.json`);
-            fs.writeFileSync(tempFile, state.sbom);
-
-            // Esegue Grype sull'SBOM e richiede output in JSON
-            const grypeOutput = execSync(`grype sbom:${tempFile} -o json`, { encoding: 'utf-8' }).trim();
-            //const report = JSON.parse(grypeOutput);
-
-            // Estrae le vulnerabilità con severità Critical o High
-            //const criticalHigh = report.matches
-                //.filter(m => ['Critical', 'High'].includes(m.vulnerability.severity))
-                //.map(m => `${m.artifact.name}@${m.artifact.version} -> ${m.vulnerability.id} (${m.vulnerability.severity})`);
-
-            //const summary = criticalHigh.length > 0
-            //    ? criticalHigh.join('\n')
-            //    : "Nessuna vulnerabilità critica o alta trovata.";
+            // Limita a 300 dipendenze per stare sotto il limite token
+            const limited = artifacts.slice(0, 300);
+            const summary = JSON.stringify(limited, null, 2);
 
             const response = await model.invoke([
               new SystemMessage(
-                  `Sei un esperto di sicurezza e qualità del codice. 
-                        Analizza il report Grype sulle dipendenze e librerie.
-                        Crea un report discorsivo che spieghi le vulnerabilita e che versione serve per sistemarle.`
+                  `Restituisci un report sintetico relativo alle dipendenze e librerire trovate da Syft, prova a capire che framework vengono utilizzati..`
               ),
               new HumanMessage(
-                  `Dati Grype: \n${grypeOutput}\n\n`),
+                  `Dati Syft (${artifacts.length} dipendenze totali, mostrate le prime ${limited.length}): \n${summary}`
+              ),
             ]);
-            console.log(response)
+
+            console.log(response);
             return { analysis: `${state.analysis + response.content}` };
           } catch (error) {
-            console.error('Errore durante l\'analisi Grype:', error);
-            throw new Error('Impossibile eseguire Grype sullo SBOM.');
-          } finally {
-            // rimuove il file temporaneo
-            if (tempFile && fs.existsSync(tempFile)) {
-              fs.unlinkSync(tempFile);
-            }
+            console.error(`Errore durante l'analisi Syft:`, error);
+            throw new Error(`Impossibile analizzare la repository: ${error}`);
           }
         })
 
@@ -255,8 +231,7 @@ export class AgentService {
       .addEdge('readme_analysis', 'remediation')
       .addEdge('remediation', 'get_languages')
       .addEdge('get_languages', 'dependencies')
-      .addEdge('dependencies', 'dependencies_vulnerability')
-      .addEdge('dependencies_vulnerability', END)
+      .addEdge('dependencies', END)
 
     const app = workflow.compile();
     return (await app.invoke({})).analysis;
