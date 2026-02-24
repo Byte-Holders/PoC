@@ -1,25 +1,25 @@
 import { Injectable } from '@nestjs/common';
 import path from 'path';
 import fs from 'fs';
-import { execSync } from 'child_process';
+import { execSync, spawn, exec} from 'child_process';
 import { StateGraph, START, END, Annotation } from '@langchain/langgraph';
 import { SystemMessage, HumanMessage } from '@langchain/core/messages';
 import { ChatBedrockConverse } from '@langchain/aws';
 import git from 'isomorphic-git';
-// import per isomorphic-git (clone)
 import http from 'isomorphic-git/http/node';
-// import fs from 'fs'; (sopra)
 import { Octokit } from 'octokit';
 import { CoverageService } from '../test_coverage/coverage.service';
-
 import dotenv from 'dotenv';
-
 dotenv.config();
+const os = require('os');
+
 
 const AgentState = Annotation.Root({
-  reportPath: Annotation<string | unknown>(),
+  reportPath: Annotation<string>(),
   coverageData: Annotation<any>(),
   analysis: Annotation<string>(),
+  sbom: Annotation<string>(),
+  remediationResult: Annotation<string>(),
 });
 
 export type ModelCreateInfo = {
@@ -106,22 +106,59 @@ export class AgentService {
           return { coverageData: { error: "Non disponibile o fallito" } };
         }
       })
+      .addNode('remediation', async(state: typeof AgentState.State) => {
 
+          try{
+            if (!state.reportPath || !fs.existsSync(state.reportPath)) {
+              return { remediationResult: "Nessun report di sicurezza disponibile per generare remediation." };
+            }
+            const rawData = fs.readFileSync(state.reportPath, 'utf-8');
+            const jsonReport = JSON.parse(rawData);
+
+            const firstResult = jsonReport.results[0];
+
+            const filePath = firstResult.path;
+            console.log(`Inizio Remediation su : ${filePath}`);
+            const fileContent = fs.readFileSync(filePath);
+
+            if (!jsonReport.results || jsonReport.results.length === 0) {
+              return { remediationResult: "Nessuna vulnerabilità critica trovata da Semgrep." };
+            }
+
+            const response = await model.invoke([
+              new SystemMessage(`Sei un esperto di remediation. Analizza il seguente JSON di Semgrep. 
+            Per ogni vulnerabilità trovata, il codice codice 'BEFORE' (vulnerabile) e 'AFTER' (sicuro). Assicurati per ogni vulnerabilita' di spiegare il problema in un massimo di 25 parole.`),
+              new HumanMessage(
+                  `Dati Semgrep: \n${JSON.stringify(firstResult)}\n\n 
+                        File da correggere: \n${fileContent}`
+              ),
+            ]);
+
+            return { remediationResult: response.content as string };
+
+          } catch (err) {
+            console.log('Fallimento remediation', err);
+            return { remediationResult: "Errore durante la generazione della remediation." };
+          }
+      })
       // Nodo 3: AI Analysis
       .addNode('ai_analysis', async (state) => {
         const semgrepRaw = fs.readFileSync(state.reportPath as string, 'utf-8');
 
         // Prepariamo un contesto che includa sia Semgrep che Coverage
+
         const coverageContext = JSON.stringify(state.coverageData, null, 2);
         const response = await model.invoke([
           new SystemMessage(
             `Sei un esperto di sicurezza e qualità del codice. 
                         Analizza il report Semgrep (sicurezza) e i dati di Test Coverage (qualità).
-                        Crea un report discorsivo che metta in relazione i due aspetti.`
+                        Crea un report discorsivo che metta in relazione i due aspetti.
+                        Aggiungi infine la  remediation che hai ricevuto, senza fare commenti a riguargo.`
           ),
           new HumanMessage(
             `Dati Semgrep: \n${semgrepRaw}\n\n 
-                        Dati Coverage: \n${coverageContext}`
+                        Dati Coverage: \n${coverageContext}
+                            Dati Remediation: \n${state.remediationResult}`
           ),
         ]);
         console.log(response)
@@ -149,13 +186,52 @@ export class AgentService {
         return { analysis: `${state.analysis + response}` };
       })
 
-      // --- Definizione dei collegamenti ---
+        .addNode('dependencies', async (state) => {
+          console.log(`Analisi dipendenze della repo ${repoName} in corso...`);
+          try {
+            const dep = execSync(`syft dir:${fullRepoPath} -o json -q`).toString().trim();
+            const syftJson = JSON.parse(dep);
+
+            // Estrai solo i campi utili da ogni artifact
+            const artifacts = syftJson.artifacts?.map((a: any) => ({
+              name: a.name,
+              version: a.version,
+              type: a.type,
+              language: a.language ?? null,
+              licenses: a.licenses?.map((l: any) => l.value ?? l) ?? [],
+            })) ?? [];
+
+            // Limita a 300 dipendenze per stare sotto il limite token
+            const limited = artifacts.slice(0, 300);
+            const summary = JSON.stringify(limited, null, 2);
+
+            const response = await model.invoke([
+              new SystemMessage(
+                  `Restituisci un report sintetico relativo alle dipendenze e librerire trovate da Syft, prova a capire che framework vengono utilizzati..`
+              ),
+              new HumanMessage(
+                  `Dati Syft (${artifacts.length} dipendenze totali, mostrate le prime ${limited.length}): \n${summary}`
+              ),
+            ]);
+
+            console.log(response);
+            return { analysis: `${state.analysis + response.content}` };
+          } catch (error) {
+            console.error(`Errore durante l'analisi Syft:`, error);
+            throw new Error(`Impossibile analizzare la repository: ${error}`);
+          }
+        })
+
+
+        // --- Definizione dei collegamenti ---
       .addEdge(START, 'run_scan')
-      .addEdge('run_scan', 'run_coverage') // Sequenziale
+      .addEdge('run_scan', 'run_coverage')
       .addEdge('run_coverage', 'ai_analysis')
       .addEdge('ai_analysis', 'readme_analysis')
-      .addEdge('readme_analysis', 'get_languages')
-      .addEdge('get_languages', END);
+      .addEdge('readme_analysis', 'remediation')
+      .addEdge('remediation', 'get_languages')
+      .addEdge('get_languages', 'dependencies')
+      .addEdge('dependencies', END)
 
     const app = workflow.compile();
     return (await app.invoke({})).analysis;
@@ -249,6 +325,8 @@ export class AgentService {
 
     return result;
   }
+
+
 
   private readonly octokit: Octokit;
 }
