@@ -9,8 +9,10 @@ ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 ENV PNPM_VERSION=${PNPM_VERSION};
 
-RUN --mount=type=cache,target=/root/.npm \
+RUN --mount=type=cache,target=/root/.npm\
     npm install -g pnpm@latest-10
+
+RUN rm -rf node_modules
 
 COPY package*.json .
 
